@@ -1,0 +1,128 @@
+module RasterizeBlock(
+	input logic clock, reset, data_in,
+	// The color of the current triangle in 16 bit color
+	// 5 bits of red, 6 bits of green, 5 bits of blue
+	input logic[15:0] color,
+	// Depth values in Q6.12
+	input logic[17:0] d1, d2, d3,
+	// Triangle vertex values in Q18.0
+	input logic[17:0] v1[1:0], v2[1:0], v3[1:0],
+	// The location of the top left corner of the block in Q10.0
+	input logic[9:0] block_location[1:0],
+
+	// Each pixel is outputted in serial, 2 cycles per color (for now?)
+	// Color of the current pixel being outputted
+	output logic[15:0] color_out,
+	// The coordinates of the current pixel being outputted in Q10.0
+	output logic[9:0] location_out[1:0],
+	// A signal that indicates that data is being outputted to be written to memory
+	output logic data_out,
+
+	// Indicates that the block is ready to accept another stream of triangles
+	output logic ready
+);
+	logic[35:0] denominator;
+	ComputeDenominator cd(.*);
+
+	logic[17:0] coords[1:0][63:0];
+
+	always_comb begin 
+		for (logic[2:0] x = 0; x < 8; x++) begin
+			for (logic[2:0] y = 0; y < 8; y++) begin 
+				coords[x * 8 + y][1] = {8'd0, block_location[1]} + {15'd0, x};
+				coords[x * 8 + y][0] = {8'd0, block_location[0]} + {15'd0, y};
+			end 
+		end 
+	end
+
+	logic rasterization_complete;
+	logic loaded_rasterized_data;
+	logic serialization_complete;
+
+	logic[15:0] color_out_imm[63:0];
+	logic data_out_imm[63:0];
+	logic reset_rp;
+
+	assign reset_rp = loaded_rasterized_data | reset;
+
+	RasterizePixel rp[63:0] (.clock, .reset(reset_rp), .data_in, .color, .d1, .d2, .d3, 
+		                                          .point(coords), .v1, .v2, .v3, .denominator,
+		                                          .color_out(color_out_imm), .data_out(data_out_imm));
+
+	logic[15:0] color_buffer[63:0];
+	logic[9:0] prev_block_location[1:0];
+	logic[2:0] cur_serialization_offset[1:0];
+	logic cur_serialization_cycle;
+	always_ff @ (posedge clock) begin 
+		if (reset) begin 
+			serialization_complete <= 1'b1;
+			rasterization_complete <= 1'b0;
+			loaded_rasterized_data <= 1'b0;
+		end 
+
+		// The rasterized data is loaded into the color buffer when both rasterization and serialization are complete
+		loaded_rasterized_data <= rasterization_complete & serialization_complete;
+
+		// If data is being outputted by rp, rasterization is complete
+		// We reset this back to 0 when the data is loaded into the color buffero
+		if (data_out_imm[0])             rasterization_complete <= 1'b1;
+		else if (loaded_rasterized_data) rasterization_complete <= 1'b0;
+		else                             rasterization_complete <= rasterization_complete;
+
+		for (int i = 0; i < 64; i++) begin 
+			// If both rasterization and serialization are complete, load the color buffer with the next set of data
+			if (rasterization_complete & serialization_complete) color_buffer[i] <= color_out_imm[i];
+			else                                                 color_buffer[i] <= color_buffer[i];
+		end
+
+		// The circuit is ready to accept more data when the current block's data has been loaded into the color buffer
+		ready <= loaded_rasterized_data;
+
+		// Initialization serialization process
+		if (loaded_rasterized_data) begin 
+			prev_block_location <= block_location;
+			cur_serialization_offset <= '{3'd0, 3'd0};
+			cur_serialization_cycle <= 1'b0;
+			serialization_complete <= 1'b0;
+		end 
+
+		// Perform serialization
+		if (~serialization_complete) begin 
+			data_out <= 1'b1;
+			cur_serialization_cycle <= ~cur_serialization_cycle;
+
+			// Update location for next cycle
+			if (cur_serialization_cycle == 1'b1) begin
+				if (cur_serialization_offset[1] == 3'd7) begin 
+					if (cur_serialization_offset[0] == 3'd7) begin 
+						// We don't care what happens to the offset here
+						serialization_complete <= 1'b1;
+					end 
+					else begin 
+						serialization_complete <= 1'b0;
+						cur_serialization_offset[1] <= 3'd0;
+						cur_serialization_offset[0] <= cur_serialization_offset[0] + 3'd1;
+					end 
+				end 
+				else begin 
+					serialization_complete <= 1'b0;
+					cur_serialization_offset[1] <= cur_serialization_offset[1] + 3'd1;
+					cur_serialization_offset[0] <= cur_serialization_offset[0];
+				end 
+			end 
+			else begin 
+				// Keep the same location if we are not done writing
+				serialization_complete <= 1'b0;
+				cur_serialization_offset[1] <= cur_serialization_offset[1];
+				cur_serialization_offset[0] <= cur_serialization_offset[0];
+			end 
+
+			// Output the current location
+			location_out[1] <= prev_block_location[1] + {7'd0, cur_serialization_offset[1]};
+			location_out[0] <= prev_block_location[0] + {7'd0, cur_serialization_offset[0]};			
+
+			// Output the color for the corresponding pixel
+			color_out <= color_buffer[cur_serialization_offset[1] * 8 + cur_serialization_offset[0]];
+		end 
+	end 
+endmodule

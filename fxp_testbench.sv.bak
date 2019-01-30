@@ -1,0 +1,44 @@
+module fxp_testbench();
+
+timeunit 10ns;
+
+timeprecision 1ns;
+
+logic add_sub;
+logic clock;
+logic[31:0] dataa;
+logic[31:0] datab;
+logic[31:0] result_addsub;
+
+logic[31:0] result_mult;
+
+// FXPAddSub addsub(.clock, .add_sub, .dataa, .datab, .result(result_addsub));
+LPMMult lpm(.clock, .dataa, .datab, .result(result_mult));
+
+// Toggle the clock
+// #1 means wait for a delay of 1 timeunit
+always begin : CLOCK_GENERATION
+#1	clock = ~clock;
+end
+
+initial begin: CLOCK_INITIALIZATION
+	clock = 1;
+end 
+
+initial begin: TEST
+// FXPAddSub
+#2	add_sub = 1'b1;
+	dataa = 32'd186737709;
+	datab = 32'd15;
+
+#2	add_sub = 1'b0;
+
+#1	// Offset for assertion
+#2 	assert (result_addsub == 32'd186737724);
+#2 	assert (result_addsub == 32'd186737694);
+
+#2	dataa = 32'd186737709;
+	datab = 32'd234879;
+
+end
+endmodule

@@ -1,0 +1,32 @@
+module testbench();
+
+timeunit 10ns;
+
+timeprecision 1ns;
+
+logic Clk_100, read_enable, write_enable,
+logic [15:0] write_data,
+logic [19:0] write_addr, read_addr,
+logic CE, UB, LB, OE, WE,
+logic [15:0] read_data
+logic [19:0] ADDR,
+wire [15:0] Data
+
+SRAM_Ctrl inst(.*);
+
+always begin : CLOCK_GENERATION
+#1	Clk_100 = ~Clk_100;
+end 
+
+initial begin : CLOCK_INITIALIZATION 
+	Clk_100 = 1;
+end 
+
+// Tested instructions:
+// - ADDi
+// - ADD
+initial begin : TEST 
+
+end 
+
+endmodule

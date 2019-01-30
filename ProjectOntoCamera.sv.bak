@@ -1,0 +1,255 @@
+module PipelineBuffer #(parameter NUM_ITEMS = 3, parameter WORD_SIZE = 32) (
+	input logic clock, start,
+	input logic[WORD_SIZE-1:0] in[NUM_ITEMS-1:0],
+
+	output logic[WORD_SIZE-1:0] out[NUM_ITEMS-1:0],
+	output logic[WORD_SIZE-1:0] values_to_use[NUM_ITEMS-1:0]
+);	
+	logic[WORD_SIZE-1:0] register[NUM_ITEMS-1:0];
+
+	always_comb begin
+		if (start) begin
+			for (int i = 0; i < NUM_ITEMS; i++) values_to_use[i] = in[i];
+		end 
+		else begin
+			for (int i = 0; i < NUM_ITEMS; i++) values_to_use[i] = register[i];
+		end
+
+		for (int i = 0; i < NUM_ITEMS; i++) out[i] = register[i];
+	end // always_comb
+
+	always_ff @ (posedge clock) begin
+		for (int i = 0; i < NUM_ITEMS; i++) register[i] <= register[i];
+
+		if (start) begin
+			for (int i = 0; i < NUM_ITEMS; i++) register[i] <= in[i];
+		end 
+	end
+endmodule
+
+module DataValidBuffer(
+	input logic clock, reset, start, data_in,
+	output logic data_out
+);
+	
+	always_ff @ (posedge clock) begin
+		if (reset)      data_out <= 1'b0;
+		else if (start) data_out <= data_in;
+		else            data_out <= data_out;
+	end
+endmodule 
+
+// Computes vector subtraction (point - camera_origin)
+module POC_s1(
+	input logic clock, reset, start, 
+	input logic data_in,
+
+	input logic[31:0] camera_origin[2:0],
+	input logic[31:0] point[2:0],
+
+	// A ray going from camera_origin to point
+	output logic[31:0] camera_to_point[2:0],
+	output logic data_out
+);
+	logic[31:0] point_b[2:0];
+
+	PipelineBuffer point_buffer(.clock, .start, .in(point), .values_to_use(point_b));
+	DataValidBuffer data_valid_buffer(.*);
+
+	FPAddSub x_sub(.clock, .add_sub(1'b0), .dataa(point[2]), .datab(camera_origin[2]), .result(camera_to_point[2]));
+	FPAddSub y_sub(.clock, .add_sub(1'b0), .dataa(point[1]), .datab(camera_origin[1]), .result(camera_to_point[1]));
+	FPAddSub z_sub(.clock, .add_sub(1'b0), .dataa(point[0]), .datab(camera_origin[0]), .result(camera_to_point[0]));
+endmodule 
+
+// Gets partial terms of the dot product between n_vec and camera_to_point
+module POC_s2(
+	input logic clock, reset, start, data_in,
+
+	input logic[31:0] camera_to_point[2:0],
+	input logic[31:0] n_vec[2:0],
+
+	output logic[31:0] n_dot_partials[2:0],
+	output logic data_out
+);
+	logic[31:0] camera_to_point_b[2:0];
+
+	PipelineBuffer camera_to_point_buffer(.clock, .start, .in(camera_to_point), .values_to_use(camera_to_point_b));
+	DataValidBuffer data_valid_buffer(.*);
+
+	FPMult x_mult(.clock, .dataa(camera_to_point[2]), .datab(n_vec[2]), .result(n_dot_partials[2]));
+	FPMult y_mult(.clock, .dataa(camera_to_point[1]), .datab(n_vec[1]), .result(n_dot_partials[1]));
+	FPMult z_mult(.clock, .dataa(camera_to_point[0]), .datab(n_vec[0]), .result(n_dot_partials[0]));
+endmodule 
+
+// Gets partial terms of u_vec * camera_to_point and v_vec * camera_to_point, and get one partial sum of the dot product for n
+module POC_s3(
+	input logic clock, reset, start, data_in,
+
+	input logic[31:0] n_dot_partials[2:0],
+	input logic[31:0] u_vec[2:0], v_vec[2:0],
+
+	output logic[31:0] u_dot_partials[2:0], v_dot_partials[2:0],
+	output logic[31:0] n_partial_sums[1:0],
+	output logic data_out
+);
+	logic[31:0] n_dot_partials_b[2:0];
+	logic[31:0] n_dot_partials_out[2:0];
+
+	PipelineBuffer n_dot_partials_buffer(.clock, .start, .in(n_dot_partials), .values_to_use(n_dot_partials_b), .out(n_dot_partials_out));
+	DataValidBuffer data_valid_buffer(.*);
+
+	FPMult u_x_mult(.clock, .dataa(camera_to_point[2]), .datab(u_vec[2]), .result(u_dot_partials[2]));
+	FPMult u_y_mult(.clock, .dataa(camera_to_point[1]), .datab(u_vec[1]), .result(u_dot_partials[1]));
+	FPMult u_z_mult(.clock, .dataa(camera_to_point[0]), .datab(u_vec[0]), .result(u_dot_partials[0]));
+
+	FPMult v_x_mult(.clock, .dataa(camera_to_point[2]), .datab(v_vec[2]), .result(v_dot_partials[2]));
+	FPMult v_y_mult(.clock, .dataa(camera_to_point[1]), .datab(v_vec[1]), .result(v_dot_partials[1]));
+	FPMult v_z_mult(.clock, .dataa(camera_to_point[0]), .datab(v_vec[0]), .result(v_dot_partials[0]));
+
+	FPAddSub n_partial_sum_add(.clock, .add_sub(1'b1), .dataa(n_dot_partials[2]), .datab(n_dot_partials[1]), .result(n_partial_sums[1]));
+	assign n_partial_sums[0] = n_dot_partials_out[0];
+endmodule 
+
+// Computes the value of n, and the partial terms of the dot products for u and v
+module POC_s4(
+	input logic clock, reset, start, data_in,
+
+	input logic[31:0] n_partial_sums[1:0],
+	input logic[31:0] u_dot_partials[2:0], v_dot_partials[2:0],
+
+	output logic[31:0] n_out,
+	output logic[31:0] u_partial_sums[1:0],
+	output logic[31:0] v_partial_sums[1:0],
+	output logic data_out
+);
+	logic[31:0] u_dot_partials_b[2:0];
+	logic[31:0] u_dot_partials_out[2:0];
+	logic[31:0] v_dot_partials_b[2:0];
+	logic[31:0] v_dot_partials_out[2:0];
+	logic[31:0] n_partial_sums_b[1:0];
+
+	PipelineBuffer u_dot_partials_buffer(.clock, .start, .in(u_dot_partials), .values_to_use(u_dot_partials_b), .out(u_dot_partials_out));
+	PipelineBuffer v_dot_partials_buffer(.clock, .start, .in(v_dot_partials), .values_to_use(v_dot_partials_b), .out(v_dot_partials_out));
+	PipelineBuffer #(.NUM_ITEMS(2)) n_partial_sums_buffer(.clock, .start, .in(n_partial_sums), .values_to_use(n_partial_sums_b));
+	DataValidBuffer data_valid_buffer(.*);
+
+	FPAddSub n_add(.clock, .add_sub(1'b1), .dataa(n_partial_sums[1]), .datab(n_partial_sums[0]), .result(n_out));
+
+	FPAddSub u_partial_sum_add(.clock, .add_sub(1'b1), .dataa(u_dot_partials[2]), .datab(u_dot_partials[1]), .result(u_partial_sums[1]));
+	assign u_partial_sums[0] = n_dot_partials_out[0];
+
+	FPAddSub v_partial_sum_add(.clock, .add_sub(1'b1), .dataa(v_dot_partials[2]), .datab(v_dot_partials[1]), .result(v_partial_sums[1]));
+	assign v_partial_sums[0] = n_dot_partials_out[0];
+endmodule 
+
+// Finishes computing the dot products u * camera_to_point and v * camera_to_point
+module POC_s5(
+	input logic clock, reset, start, data_in,
+
+	input logic[31:0] n_in,
+	input logic[31:0] u_partial_sums[1:0],
+	input logic[31:0] v_partial_sums[1:0],
+
+	output logic[31:0] n_out, u_dot, v_dot,
+	output logic data_out
+);
+	logic[31:0] u_partial_sums_b[1:0];
+	logic[31:0] v_partial_sums_b[1:0];
+
+	PipelineBuffer n_buffer(.clock, .start, .in(n_in), .out(n_out));
+	PipelineBuffer #(.NUM_ITEMS(2)) u_partial_sums_buffer(.clock, .start, .in(u_partial_sums), .values_to_use(u_partial_sums_b));
+	PipelineBuffer #(.NUM_ITEMS(2)) v_partial_sums_buffer(.clock, .start, .in(v_partial_sums), .values_to_use(v_partial_sums_b));
+	DataValidBuffer data_valid_buffer(.*);
+
+	FPAddSub u_add(.clock, .add_sub(1'b1), .dataa(u_partial_sums[1]), .datab(u_partial_sums[0]), .result(u_dot));
+	FPAddSub v_add(.clock, .add_sub(1'b1), .dataa(v_partial_sums[1]), .datab(v_partial_sums[0]), .result(v_dot));
+endmodule 
+
+module POC_s6(
+	input logic clock, reset, start, data_in,
+	input logic[31:0] n_in, u_dot, v_dot,
+	output logic[31:0] n_out, u_out, v_out,
+	output logic data_out
+);
+	logic[31:0] n_b, u_dot_b, v_dot_b;
+
+	PipelineBuffer n_buffer(.clock, .start, .in(n_in), .out(n_out), .values_to_use(n_b));
+	PipelineBuffer #(.NUM_ITEMS(1)) u_dot_buffer(.clock, .start, .in('{u_dot}), .values_to_use('{u_dot_b}));
+	PipelineBuffer #(.NUM_ITEMS(1)) v_dot_buffer(.clock, .start, .in('{v_dot}), .values_to_use('{v_dot_b}));
+	DataValidBuffer data_valid_buffer(.*);
+
+	FPDiv u_div(.clock, .dataa(u_dot_b), .datab(n_b), .result(u_out));
+	FPDiv v_div(.clock, .dataa(v_dot_b), .datab(n_b), .result(v_out));
+endmodule 
+
+module ProjectOntoCamera(
+	input logic clock, reset, stall,
+
+	// Indicates that data is being inputted
+	// This must become high exactly with ready_in or the pipeline will give incorrect value for data_out
+	input logic data_in,
+	// Data that the pipeline will process
+	input logic[31:0] camera_origin[2:0],
+	input logic[31:0] point[2:0],
+	input logic[31:0] u_vec[2:0], v_vec[2:0], n_vec[2:0],
+
+	output logic[31:0] u, v, n,
+	// Indicates that a piece of data is done processing and is being outputted
+	output logic data_out,
+	// Indicates that the pipeline is ready to take in more data
+	output logic ready_in
+);
+	logic start;
+
+	logic s1_out, s2_out, s3_out, s4_out, s5_out, s6_out;
+	// Stage 1 output
+	logic[31:0] camera_to_point[2:0];
+	// Stage 2 output
+	logic[31:0] n_dot_partials[2:0];
+	// Stage 3 output
+	logic[31:0] u_dot_partials[2:0], v_dot_partials[2:0], n_partial_sums[1:0];
+	// Stage 4 output
+	logic[31:0] n_s4, u_partial_sums[1:0], v_partial_sums[1:0];
+	// Stage 5 output
+	logic[31:0] n_s5, u_dot, v_dot;
+	// Stage 6 output
+	logic[31:0] n_out, u_out, v_out;
+
+	POC_s1 s1(.clock, .reset, .start, .data_in, .camera_origin, .point, 
+		      .camera_to_point, .data_out(s1_out));
+	POC_s2 s2(.clock, .reset, .start, .data_in(s1_out), .camera_to_point, .n_vec, 
+		      .n_dot_partials, .data_out(s2_out));
+	POC_s3 s3(.clock, .reset, .start, .data_in(s2_out), .n_dot_partials, .u_vec, .v_vec, 
+		      .u_dot_partials, .v_dot_partials, .n_partial_sums, .data_out(s3_out));
+	POC_s4 s4(.clock, .reset, .start, .data_in(s3_out), .n_partial_sums, .u_dot_partials, .v_dot_partials,
+		      .n_out(n_s4), .u_partial_sums, .v_partial_sums, .data_out(s4_out));
+	POC_s5 s5(.clock, .reset, .start, .data_in(s4_out), .n_in(n_s4), .u_partial_sums, .v_partial_sums,
+		      .n_out(n_s5), .u_dot, .v_dot, .data_out(s5_out));
+	POC_s6 s6(.clock, .reset, .start, .data_in(s5_out), .n_in(n_s5), .u_dot, .v_dot,
+		      .n_out(n_s6), .u_out, .v_out, .data_out(s6_out));
+
+	assign u = u_out;
+	assign v = v_out;
+	assign n = n_s6;
+
+	// Pipeline frequency is 8
+	logic[2:0] pipeline_counter;
+
+	always_ff @ (posedge clock) begin
+		if (reset) begin
+			pipeline_counter <= 3'd1;
+		end // if (reset)
+		else begin
+			if (pipeline_counter == 3'd0)
+				pipeline_counter <= 3'd7;
+			else
+				pipeline_counter <= pipeline_counter - 3'd1;
+		end // else
+	end // always_ff @ (posedge clock)
+
+	always_comb begin
+		start = ~stall & (pipeline_counter == 3'd0);
+		ready_in = start;
+		data_out = (s6_out == 1'b1) ? start : 1'b0;
+	end // always_comb
+endmodule

@@ -1,0 +1,28 @@
+module SwapBuffer(
+	input logic clock, reset, rf_completed_frame, dc_completed_frame,
+	output logic[19:0] front_buffer_addr, back_buffer_addr
+	output logic swapped
+);
+	parameter[19:0] BUFFER_1 = 20'd0;
+	parameter[19:0] BUFFER_2 = 20'd307200;
+
+	enum logic cur_buffer_state;
+	logic swap;
+	// We should swap if both the rasterizer and the VGA controller are finished with their frame
+	assign swap = rf_completed_frame & dc_completed_frame;
+
+	always_ff @ (posedge clock) begin 
+		if (reset) begin 
+			cur_buffer_state <= 1'b0;
+		end 
+		else begin 
+			if (swap) cur_buffer_state <= ~cur_buffer_state;
+			else      cur_buffer_state <= cur_buffer_state;
+		end 
+
+		swapped <= swap;
+	end 
+
+	assign front_buffer_addr = cur_buffer_state ? BUFFER_1 : BUFFER_2;
+	assign back_buffer_addr =  cur_buffer_state ? BUFFER_2 : BUFFER_1;
+endmodule 

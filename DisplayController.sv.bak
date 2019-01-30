@@ -1,0 +1,58 @@
+module DisplayController(
+	input logic clock, clock_25, reset,
+	// The address of the buffer that is being displayed in SRAM
+	input logic[19:0] front_buffer_addr,
+	// The data read from SRAM
+	input logic[15:0] read_data,
+
+	output logic[7:0] VGA_R, // VGA Red
+                      VGA_G, // VGA Green
+                      VGA_B, // VGA Blue
+	output logic VGA_SYNC_N,  // VGA Sync signal
+                 VGA_BLANK_N, // VGA Blank signal
+                 VGA_VS,      // VGA virtical sync signal
+                 VGA_HS,      // VGA horizontal sync signal
+    // Signals sent to SRAM to read the pixels from memory
+    output logic read_enable, 
+    output logic[19:0] read_addr,
+    // Set to high when it is ready for the next frame 
+    output logic completed_frame
+);
+	logic[9:0] x_next;
+	logic[9:0] y_next;
+	VGA_controller vga(.clock, .reset, .VGA_CLK(clock_25), .VGA_HS, .VGA_VS, .VGA_BLANK_N, .VGA_SYNC_N, 
+		               .DrawX_next(x_next), .DrawY_next(y_next));
+
+	logic[19:0] pixel_addr;
+	SerializeBlock get_sram_addr(.address_offset(front_buffer_addr), .location('{x_next, y_next}), .address(pixel_addr));
+	assign read_addr = pixel_addr;
+
+	logic[11:0] x_minus_width;
+	logic[11:0] y_minus_height;
+	always_comb begin 
+		x_minus_width = {2'b0, x_next} - 12'd640;
+		y_minus_height = {2'b0, y_next} - 12'd480;
+
+		// If x - 640 >= 0 (ie, x - 640 is not negative) this is an invalid location 
+		if (~x_minus_width[11]) read_enable = 1'b0;
+		// If y - 480 >= 0 (ie, x - 480 is not negative) this is an invalid location
+		else if (~y_minus_height[11]) read_enable = 1'b0;
+		else read_enable = 1'b1;
+	end 
+
+	logic VGA_VS_prev;
+	always_ff @ (posedge clock) begin 
+		if (reset) VGA_VS_prev <= 1'b0;
+		else VGA_VS_prev <= VGA_VS;
+	end 
+	always_ff @ (posedge clock_25) begin 
+		VGA_R <= {read_data[15:11], 3'd0};
+		VGA_G <= {read_data[10:5], 2'd0};
+		VGA_B <= {read_data[4:0], 3'd0};
+	end 
+
+	// Completed frame goes high on the rising edge of VGA_VS
+	assign completed_frame = ~VGA_VS_prev & VGA_VS;
+
+	
+endmodule 

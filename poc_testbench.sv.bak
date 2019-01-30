@@ -1,0 +1,104 @@
+module poc_testbench();
+
+timeunit 10ns;
+
+timeprecision 1ns;
+
+logic clock, reset, stall;
+
+// Indicates that data is being inputted
+// This must become high exactly with ready_in or the pipeline will give incorrect output
+logic data_in;
+// Data that the pipeline will process
+logic[31:0] camera_origin[2:0];
+logic[31:0] point[2:0];
+logic[31:0] u_vec[2:0], v_vec[2:0], n_vec[2:0];
+
+logic[31:0] u, v, n;
+// Indicates that a piece of data is done processing and is being outputted
+logic data_out;
+// Indicates that the pipeline is ready to take in more data
+logic ready_in;
+
+ProjectOntoCamera poc(.*);
+
+// Toggle the clock
+// #1 means wait for a delay of 1 timeunit
+always begin : CLOCK_GENERATION
+#1	clock = ~clock;
+end
+
+initial begin: CLOCK_INITIALIZATION
+	clock = 1;
+end 
+
+initial begin: TEST
+	// (0, 0, 0)
+	camera_origin[2] = 32'h00000000; camera_origin[1] = 32'h00000000; camera_origin[0] = 32'h00000000;
+	// (1/sqrt(2), 1/sqrt(2), 0)
+	u_vec[2] = 32'h3f3504f3; u_vec[1] = 32'h3f3504f3; u_vec[0] = 32'h00000000;
+	// (-1/sqrt(2), 1/sqrt(2), 0)
+	v_vec[2] = 32'hbf3504f3; v_vec[1] = 32'h3f3504f3; v_vec[0] = 32'h00000000;
+	// (0, 0, -1)
+	n_vec[2] = 32'h00000000; n_vec[1] = 32'h00000000; n_vec[0] = 32'hbf800000;
+
+	reset = 1'b1;
+	stall = 1'b0;
+	data_in = 1'b0;
+
+#2	reset = 1'b0;
+	
+	data_in = 1'b1;
+	// (0, 1, -2) -> (1 / (2 rt 2), 1 / (2 rt 2), 2)
+	point[2] = 32'h00000000; point[1] = 32'h3f800000; point[0] = 32'hc0000000;
+
+
+#4	data_in = 1'b0;
+	point[2] = 32'h00000000; point[1] = 32'h00000000; point[0] = 32'h00000000;
+
+// We need to wait for 1 stage to complete, which takes 7 cycles total; we have already skipped 2 cycles, so only 10 time ticks 
+
+#10	data_in = 1'b1;
+	// (1, 1, -2) -> (rt 2, 0, 2)
+	point[2] = 32'h3f800000; point[1] = 32'h3f800000; point[0] = 32'hc0000000;
+
+#4  data_in = 1'b0;
+	point[2] = 32'h00000000; point[1] = 32'h00000000; point[0] = 32'h00000000;
+
+// Now, verify that the correct answers are outputted
+// We need to wait for 6 stages since the first, which each take 7 cycles, so 42 clock cycles, 
+//   which is 84 time ticks since data_in was first asserted
+// Subtracting the amount we've waited, that's 84 - 4 - 10 - 4 = 66
+
+for (int i = 0; i < 66; i++) begin
+#1	assert (data_out == 1'b0);
+end
+
+// Offset asserts by #1 because for some reason it checks values before the rising edge
+#1
+
+// Checks that (u, v, n) == (1 / (2 rt 2), 1 / (2 rt 2), 2)
+	assert (data_out == 1'b1);
+	assert (u == 32'h3eb504f3);
+	assert (v == 32'h3eb504f3);
+	assert (n == 32'h40000000);
+
+#1
+// Now the data should no longer be outputted, as one whole clock cycle has passed
+
+// Wait 6 cycles for the next piece of data
+for (int i = 0; i < 12; i++) begin
+#1	assert (data_out == 1'b0);
+end 
+
+// Another offset for same reason as before
+#1
+
+// Checks that (u, v, n) == (rt 2, 0, 2)
+	assert (data_out == 1'b1);
+	assert (u == 32'h3f3504f3); // With minor rounding error
+	assert (v == 32'h00000000);
+	assert (n == 32'h40000000);
+
+end
+endmodule

@@ -1,0 +1,69 @@
+Quartus Prime Archive log --	/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/final_project_tmp_archive.qarlog
+
+Archive:	/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/final_project_tmp_archive.qar
+Date:		Fri Dec 14 10:23:08 2018
+Quartus Prime		18.0.0 Build 614 04/24/2018 SJ Lite Edition
+
+	=========== Files Selected: ===========
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/ComputeColor.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/DetectPosedge.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/DisplayController.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/FinalProject.qsf
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/FinalProject.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/HexDriver.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/LPMDiv16_8.qip
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/LPMDiv16_8.v
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/LPMDiv16_8_syn.v
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/LPMDiv30_18.qip
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/LPMDiv30_18.v
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/LPMDiv30_18_syn.v
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/LPMMult18_18.qip
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/LPMMult18_18.v
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/LPMMult18_18_syn.v
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/Motion.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/PLL100.ppf
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/PLL100.qip
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/PLL100.v
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/PLL100_syn.v
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/PLL25.ppf
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/PLL25.qip
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/PLL25.v
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/PLL25_syn.v
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/Pipeline.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/ProjectOntoCamera.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/RAM.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/RasterizeBlock.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/RasterizePixel.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/RenderFrame.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/SRAMController.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/SRAM_testbench.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/SerializeBlock.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/SwapBuffer.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/VGA_controller.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/color.mem
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/final_project.qpf
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/fxp_testbench.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/normal.mem
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/poc_testbench.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/rb_testbench.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/rf_testbench.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/rp_s2_testbench.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/rp_testbench.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/shadedcolor.mem
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/test_memory.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/testbench.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/trunc_testbench.sv
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/v1.mem
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/v2.mem
+/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/v3.mem
+/home/glaba/Quartus/18.0/quartus/linux64/assignment_defaults.qdf
+	======= Total: 52 files to archive =======
+
+	================ Status: ===============
+All files archived successfully.
+
+
+******* Archived project restoration attempt on Fri Dec 14 10:23:11 2018
+Source archive file:	/home/glaba/Desktop/School/Semester 3/ECE 385/ece385/final_project/final_project_tmp_archive.qar
+Archive was extracted into	/media/glaba/1803-1963/Final Project Jeff/kkanwar2_jli230/
+		 - successfully.

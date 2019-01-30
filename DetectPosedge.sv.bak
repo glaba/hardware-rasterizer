@@ -1,0 +1,12 @@
+module DetectPosedge(
+	input clock, reset, signal,
+	output posedge
+);
+	logic prev;
+	always_ff @ (posedge clock) begin 
+		if (reset)
+			prev <= 1'b0;
+		prev <= signal;
+	end 
+	assign posedge = signal & ~prev;
+endmodule 
